@@ -27,6 +27,12 @@ class StockTrades:
     total_price_volume: float = 0.0
 
 
+class NoTradesRecordedError(RuntimeError):
+    def __init__(self, stock_symbols: list):
+        message = f'No trades recorded for {", ".join(stock_symbols)}'
+        super().__init__(message)
+
+
 class TradeRecorder:
     def __init__(self, window_size):
         self._trades = {}
@@ -48,7 +54,7 @@ class TradeRecorder:
 
     def get_volume_weighted_stock_price(self, stock_symbol: str) -> float:
         if stock_symbol not in self._trades or not self._trades[stock_symbol].trades:
-            return 0
+            raise NoTradesRecordedError([stock_symbol])
         current_stock: StockTrades = self._trades[stock_symbol]
         return 0 if current_stock.total_volume == 0 else current_stock.total_price_volume / current_stock.total_volume
 
@@ -93,12 +99,12 @@ class GBCEStockMarket:
     For all stocks
     5. Calculate GBCE All Share Index using gemoetric mean of volume weighted stock price for all stocks
     """
-    def __init__(self, exchange_data: ExchangeData, trade_recorder: TradeRecorder):
-        self._stocks_dividend_data = exchange_data.get_stocks_dividend_data()
-        self._trade_recorder = trade_recorder
+    def __init__(self, exchange_data: ExchangeData = None, trade_recorder: TradeRecorder = None):
+        self._exchange_data = exchange_data or ExchangeData()
+        self._trade_recorder = trade_recorder or TradeRecorder(300)
 
     def _get_stocks_details(self, stock_symbol: str) -> StocksDividendData:
-        stock_details = self._stocks_dividend_data.get(stock_symbol)
+        stock_details = self._exchange_data.get_stocks_dividend_data().get(stock_symbol)
         if not stock_details:
             raise ValueError(f'Stock symbol input {stock_symbol} is invalid')
         return stock_details
@@ -131,6 +137,14 @@ class GBCEStockMarket:
         return self._trade_recorder.get_volume_weighted_stock_price(stock_symbol)
 
     def calculate_gbce_all_share_index(self) -> float:
-        prices = [self.calculate_volume_weighted_stock_price(key) for key, val in self._stocks_dividend_data.items()]
+        stocks_data = self._exchange_data.get_stocks_dividend_data()
+        prices = []
+        for stock_symbol in stocks_data:
+            try:
+                prices.append(self.calculate_volume_weighted_stock_price(stock_symbol))
+            except NoTradesRecordedError:
+                continue
         filtered_prices = [price for price in prices if price > 0]
+        if not filtered_prices:
+            raise NoTradesRecordedError(list(stocks_data.keys()))
         return geometric_mean(filtered_prices) if filtered_prices else 0
