@@ -2,15 +2,21 @@ from dataclasses import dataclass, field
 import time
 from enum import Enum
 from collections import deque
-from collections import namedtuple
 from statistics import geometric_mean
 from typing import Deque, Optional
+
+
+@dataclass
+class TradeType(Enum):
+    BUY = "BUY"
+    SELL = "SELL"
+
 
 @dataclass
 class Trade:
     time_stamp: float
     quantity: float
-    trade_type: str
+    trade_type: TradeType
     price: float
 
 
@@ -26,7 +32,7 @@ class TradeRecorder:
         self._trades = {}
         self._window_seconds = window_size
 
-    def add(self, stock_symbol: str, time_stamp: float, quantity: float, trade_type: str, price: float) -> None:
+    def add(self, stock_symbol: str, time_stamp: float, quantity: float, trade_type: TradeType, price: float) -> None:
         if stock_symbol not in self._trades:
             self._trades[stock_symbol] = StockTrades()
         stock_trades: StockTrades = self._trades[stock_symbol]
@@ -118,7 +124,7 @@ class GBCEStockMarket:
             return float('inf')
         return price/stock_details.last_dividend
 
-    def record_trade(self, stock_symbol: str, time_stamp: float, quantity: float, trade_type: str, price: float) -> None:
+    def record_trade(self, stock_symbol: str, time_stamp: float, quantity: float, trade_type: TradeType, price: float) -> None:
         self._trade_recorder.add(stock_symbol, time_stamp, quantity, trade_type, price)
 
     def calculate_volume_weighted_stock_price(self, stock_symbol: str) -> float:
